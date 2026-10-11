@@ -14,7 +14,9 @@
 |---|---|---|
 | [github-access.md](github-access.md) | GitHub 各通道可达性、token 权限边界、踩坑记录 | 2026-10-11 |
 | [http-200-is-not-applied.md](http-200-is-not-applied.md) | HTTP 200 不等于状态已生效（缓存竞态） | 2026-10-11 |
+| [count-defect-diagnosis.md](count-defect-diagnosis.md) | 用 diagnosing-bugs 技能修复 .Count 缺陷（含可复现测试脚本） | 2026-10-11 |
 | [issue-2-archive.md](issue-2-archive.md) | 原始 issue #2 归档（含权限补齐前后的对比） | 2026-10-11 |
+| [test-gh-count.ps1](test-gh-count.ps1) | 上条笔记的反馈循环脚本（桩替身驱动，约 2 秒，无人值守） | 2026-10-11 |
 
 ## 关键环境事实
 
