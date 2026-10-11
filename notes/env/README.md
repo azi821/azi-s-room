@@ -13,6 +13,7 @@
 | 文档 | 内容 | 最后实测 |
 |---|---|---|
 | [github-access.md](github-access.md) | GitHub 各通道可达性、token 权限边界、踩坑记录 | 2026-10-11 |
+| [http-200-is-not-applied.md](http-200-is-not-applied.md) | HTTP 200 不等于状态已生效（缓存竞态） | 2026-10-11 |
 | [issue-2-archive.md](issue-2-archive.md) | 原始 issue #2 归档（含权限补齐前后的对比） | 2026-10-11 |
 
 ## 关键环境事实
