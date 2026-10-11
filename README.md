@@ -1,15 +1,16 @@
 # azi's room
 
-这是 **azi821** 的个人仓库，由 DSH Agent 通过 GitHub REST API 初始化。
+这是 **azi821** 的个人仓库。
 
 ---
 
-## 环境备忘：为什么这里没有用 git
+## 环境备忘：网络限制的变化
 
-本机网络对 `github.com:443` 做了 **SNI 白名单审查**，只放行 `api.github.com`。
-因此 `git clone` / `git push` 全部不可用，所有写入都走 REST API。
+这个仓库的搭建过程记录了一段有意思的网络排查。**结论在过程中变了**，这里如实记录。
 
-判别实验（对同一个 IP `20.205.243.168` 发 TLS 握手，只改 TLS 里的域名字段）：
+### 最初实测：`github.com` 被 SNI 层拦截
+
+对**同一个 IP** `20.205.243.168` 发 TLS 握手，只改 TLS 里的域名字段（SNI）：
 
 | SNI | 结果 |
 |---|---|
@@ -18,10 +19,9 @@
 | `example.com` | ❌ 000 |
 | 不带 SNI | ❌ 000 |
 
-**同一 IP、同一端口，只因域名字段不同而一个通一个死** → 这是 SNI 层拦截，不是 DNS 问题。
-改 hosts、换 DNS 服务器都不会有用。
+同一 IP、同一端口，只因域名字段不同而一个通一个死 → 当时判定为 **SNI 域名白名单审查**。
 
-重复采样：
+重复采样（当时）：
 
 | 端点 | 5 次 |
 |---|---|
@@ -29,41 +29,60 @@
 | `codeload.github.com` | `301 301 301 301 301` |
 | `github.com` | `000 000 000 000 000` |
 
-> 因此 `api.github.com` 约有 20% 概率间歇性失败，所有 API 调用都内置 6 次重试
-> （只对网络失败重试，真实的 401/403/404 立即返回，不空转）。
+### 后来复测：`git` 通道恢复了
+
+同一批测试重跑，结果完全不同：
+
+| 测试 | 结果 |
+|---|---|
+| `git ls-remote` 公开仓库 | ✅ **5/5 成功** |
+| `git clone` 公开仓库 | ✅ 成功 |
+| `git clone` 本仓库 | ✅ 成功 |
+| **`git push`** | ✅ **exit=0，远端确认收到** |
+
+**所以网络限制是动态的，不是固定的。** 这本身是个重要教训：
+
+> 不要拿一次网络测试的结论当永久事实。环境会变，结论必须有时间戳。
 
 ---
 
-## 当前可用的操作（实测）
+## 当前可用能力（实测）
 
-| 操作 | 状态 | 证据 |
-|---|---|---|
-| 读取仓库 / 代码 / issue / PR | ✅ | 多次成功 |
-| 创建 issue | ✅ | HTTP 201 |
-| 修改 / 关闭 issue | ✅ | HTTP 200 |
-| **写入文件** | ✅ | HTTP 201 · commit `6aa61b7a` |
-| **建分支 / 删分支** | ✅ | HTTP 201 / 204 |
-| 创建仓库 | ❌ | HTTP 403（缺 `Administration: write`） |
-| `git push` | ❌ | 网络层封死（与权限无关） |
+| 操作 | 状态 |
+|---|---|
+| `git clone` / `git push` | ✅ **已打通** |
+| REST API 读取 | ✅ |
+| REST API 写文件 / 建分支 | ✅ |
+| 创建 / 修改 / 关闭 issue | ✅ |
 
-> 权限补齐前的实测记录见 [issue #2](https://github.com/azi821/azi-s-room/issues/2)，
-> 里面记录了两个容易踩的坑：
-> `permissions.push=true` **不代表** token 有写权限；
-> PowerShell 的 `Invoke-RestMethod` 在 403 时会返回**空响应体**，把真实原因吞掉。
+### 如果哪天 git 又断了
 
----
-
-## 配套工具
-
-详见另一台机器上的 `D:\deepseek工作文件夹\ai-connect\`：
+网络若再次收紧，还有 REST API 这条备用通道，能力覆盖大部分场景：
 
 | 脚本 | 作用 |
 |---|---|
 | `gh.ps1` | 读操作：`probe` `repo` `issues` `prs` `ci` `tree` `cat` `search` |
 | `gh-write.ps1` | 写操作：`issue` `file` `perm` `close` |
 | `net-diag.ps1` | 网络诊断：判别 SNI 审查 vs DNS 投毒 |
-| `check-capabilities.ps1` | 8 个外部服务的可达性与密钥体检 |
 
 ---
 
-*由 DSH Agent 通过 REST API 写入 · 2026-10-11*
+## 排查中踩过的坑（值得记住）
+
+**坑 1：`permissions.push = true` 不代表 token 有写权限。**
+仓库对象里这个字段只说明你是仓库所有者。实测出现过 `push=true` 但写文件 403。
+
+**坑 2：PowerShell 的 `Invoke-RestMethod` 会吞掉错误原因。**
+403 时它返回**空响应体**，只能看到 `远程服务器返回错误: (403)`。用 `curl` 重放才拿到真实原因：
+`Resource not accessible by personal access token`。
+**「空响应体」本身就是一条线索**——正常报错不会没有原因。
+
+**坑 3：判断「可达」必须看 TLS 结果，不能看 HTTP 跳转。**
+`curl http://github.com` 返回 301，被当成「通了」。实际那是 80 端口的跳转，443 依然死。
+
+**坑 4：仓库的 `size` 字段是缓存值。**
+刚提交完仍显示 `0 KB`，不能用来判断仓库是否为空。可靠判断是**默认分支的 ref 是否存在**。
+
+---
+
+*由 DSH Agent 维护*
