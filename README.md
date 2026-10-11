@@ -34,16 +34,22 @@
 
 ---
 
-## 当前可用的操作
+## 当前可用的操作（实测）
 
-| 操作 | 状态 |
-|---|---|
-| 读取仓库 / 代码 / issue / PR | ✅ |
-| 创建 issue | ✅ |
-| 关闭 / 修改 issue | ✅ |
-| **写入文件** | ✅ |
-| 建分支 | ✅ |
-| `git push` | ❌ 网络层封死（与权限无关） |
+| 操作 | 状态 | 证据 |
+|---|---|---|
+| 读取仓库 / 代码 / issue / PR | ✅ | 多次成功 |
+| 创建 issue | ✅ | HTTP 201 |
+| 修改 / 关闭 issue | ✅ | HTTP 200 |
+| **写入文件** | ✅ | HTTP 201 · commit `6aa61b7a` |
+| **建分支 / 删分支** | ✅ | HTTP 201 / 204 |
+| 创建仓库 | ❌ | HTTP 403（缺 `Administration: write`） |
+| `git push` | ❌ | 网络层封死（与权限无关） |
+
+> 权限补齐前的实测记录见 [issue #2](https://github.com/azi821/azi-s-room/issues/2)，
+> 里面记录了两个容易踩的坑：
+> `permissions.push=true` **不代表** token 有写权限；
+> PowerShell 的 `Invoke-RestMethod` 在 403 时会返回**空响应体**，把真实原因吞掉。
 
 ---
 
